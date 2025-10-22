@@ -1,0 +1,196 @@
+// Example Cursor/VSCode extension integration for CodeContext Live
+// This demonstrates how to integrate with the CodeContext Live API
+
+const axios = require('axios');
+
+const CODECONTEXT_API = 'http://localhost:3000';
+
+class CodeContextExtension {
+  constructor(context, outputChannel) {
+    this.context = context;
+    this.outputChannel = outputChannel;
+    this.panel = null;
+  }
+
+  activate() {
+    // Register command to manually trigger context analysis
+    this.context.subscriptions.push(
+      vscode.commands.registerCommand('codecontext.analyze', () => {
+        this.analyzeCurrentFile();
+      })
+    );
+
+    // Listen to file open events
+    this.context.subscriptions.push(
+      vscode.window.onDidChangeActiveTextEditor(editor => {
+        if (editor) {
+          this.onFileOpen(editor.document);
+        }
+      })
+    );
+
+    // Analyze currently open file on activation
+    if (vscode.window.activeTextEditor) {
+      this.onFileOpen(vscode.window.activeTextEditor.document);
+    }
+  }
+
+  async onFileOpen(document) {
+    const filePath = document.uri.fsPath;
+    const fileName = document.fileName;
+
+    // Only analyze COBOL, VB.NET, and C# files
+    if (!this.shouldAnalyze(fileName)) {
+      return;
+    }
+
+    this.outputChannel.appendLine(`File opened: ${filePath}`);
+
+    try {
+      const context = await this.fetchContext(filePath);
+      this.displayContext(context, fileName);
+    } catch (error) {
+      this.outputChannel.appendLine(`Error fetching context: ${error.message}`);
+    }
+  }
+
+  shouldAnalyze(fileName) {
+    const extensions = ['.cbl', '.cob', '.cobol', '.vb', '.cs'];
+    return extensions.some(ext => fileName.toLowerCase().endsWith(ext));
+  }
+
+  async fetchContext(filePath) {
+    const response = await axios.post(`${CODECONTEXT_API}/api/context/markdown`, {
+      filePath,
+    });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error);
+    }
+
+    return response.data.data;
+  }
+
+  displayContext(markdownContent, fileName) {
+    // Create or update webview panel
+    if (!this.panel) {
+      this.panel = vscode.window.createWebviewPanel(
+        'codecontext',
+        'Code Context',
+        vscode.ViewColumn.Two,
+        {
+          enableScripts: true,
+        }
+      );
+
+      this.panel.onDidDispose(() => {
+        this.panel = null;
+      });
+    }
+
+    // Convert markdown to HTML
+    const html = this.getWebviewContent(markdownContent, fileName);
+    this.panel.webview.html = html;
+    this.panel.reveal(vscode.ViewColumn.Two, true);
+  }
+
+  getWebviewContent(markdown, fileName) {
+    // Simple markdown to HTML conversion (in production, use a proper markdown parser)
+    const htmlContent = markdown
+      .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+      .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+      .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+      .replace(/\*\*(.*)\*\*/gim, '<strong>$1</strong>')
+      .replace(/\*(.*)\*/gim, '<em>$1</em>')
+      .replace(/`([^`]+)`/gim, '<code>$1</code>')
+      .replace(/\n/gim, '<br>');
+
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 20px;
+            color: #333;
+            line-height: 1.6;
+          }
+          h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+          }
+          h2 {
+            color: #34495e;
+            margin-top: 25px;
+            border-bottom: 1px solid #ecf0f1;
+            padding-bottom: 5px;
+          }
+          h3 {
+            color: #7f8c8d;
+          }
+          code {
+            background-color: #f7f9fa;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+          }
+          strong {
+            color: #2980b9;
+          }
+          a {
+            color: #3498db;
+            text-decoration: none;
+          }
+          a:hover {
+            text-decoration: underline;
+          }
+          .header {
+            background-color: #3498db;
+            color: white;
+            padding: 15px;
+            margin: -20px -20px 20px -20px;
+            border-radius: 5px 5px 0 0;
+          }
+          .footer {
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ecf0f1;
+            color: #95a5a6;
+            font-size: 0.9em;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1 style="margin: 0; border: none; color: white;">CodeContext Live</h1>
+          <p style="margin: 5px 0 0 0;">Context for: ${fileName}</p>
+        </div>
+        <div class="content">
+          ${htmlContent}
+        </div>
+        <div class="footer">
+          <p>Generated by CodeContext Live</p>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  async analyzeCurrentFile() {
+    const editor = vscode.window.activeTextEditor;
+
+    if (!editor) {
+      vscode.window.showErrorMessage('No file is currently open');
+      return;
+    }
+
+    const document = editor.document;
+    await this.onFileOpen(document);
+  }
+}
+
+module.exports = CodeContextExtension;
