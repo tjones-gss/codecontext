@@ -2,20 +2,42 @@
 
 **Live contextual intelligence for COBOL, VB.NET, and C# files**
 
-CodeContext Live is an AI-powered system that surfaces real-time contextual intelligence about any file being edited. It integrates with SVN, Jira, Monday.com, and uses Claude AI to provide developers with comprehensive context about their code.
+CodeContext Live surfaces real-time contextual intelligence about any file being edited. It integrates with SVN, Jira, Monday.com, and can optionally use AI for enhanced analysis.
+
+> **🎉 NEW: 100% Local Mode!** Run completely AI-free with zero cost and maximum privacy. See [LOCAL_ONLY_SETUP.md](LOCAL_ONLY_SETUP.md)
 
 > **💡 Don't have a powerful machine?** No problem! CodeContext Live works on ANY machine. See [LIGHTWEIGHT_SETUP.md](LIGHTWEIGHT_SETUP.md) for options that don't require Ollama.
 
+## Operation Modes
+
+### Local-Only Mode (100% FREE, No AI) ⭐ RECOMMENDED TO START
+- Zero cost, completely free forever
+- 100% private, no data sent anywhere
+- Works offline
+- Rule-based analysis using heuristics
+- **Perfect for**: Privacy-conscious users, air-gapped networks, personal projects
+- **[Quick Start Guide →](LOCAL_ONLY_SETUP.md)**
+
+### AI-Powered Mode (Enhanced Analysis)
+- Uses Claude AI for deeper insights
+- ~$0.001 per file analyzed
+- Best for professional/commercial use
+- **[Setup Guide →](SETUP.md)**
+
 ## Features
 
-- **File Monitoring**: Automatically detects when COBOL, VB.NET, or C# files are opened/modified
-- **SVN Integration**: Pulls commit history, blame information, and related files
-- **Code Analysis**: Parses code structure to identify functions, calls, and dependencies
-- **AI-Powered Insights**: Uses Claude AI to generate human-readable context summaries
-- **Vector Store**: Semantic search across your codebase using embeddings
-- **Jira Integration**: Links code changes to Jira issues
-- **Monday.com Integration**: Connects code to project management items
-- **REST API**: Easy integration with editors like Cursor, VSCode, or custom tools
+**Available in ALL Modes:**
+- ✅ **File Monitoring**: Automatically detects when COBOL, VB.NET, or C# files are opened/modified
+- ✅ **SVN Integration**: Pulls commit history, blame information, and related files
+- ✅ **Code Parsing**: Identifies functions, calls, dependencies, and data structures
+- ✅ **Context Analysis**: Generates comprehensive summaries (AI or rule-based)
+- ✅ **Jira Integration**: Links code changes to Jira issues (optional)
+- ✅ **Monday.com Integration**: Connects code to project management items (optional)
+- ✅ **REST API**: Easy integration with editors like Cursor, VSCode, or custom tools
+
+**Additional in AI Mode:**
+- ⭐ **AI-Powered Insights**: Claude generates natural language explanations
+- ⭐ **Semantic Search**: Deep understanding of code relationships (with embeddings)
 
 ## Architecture
 

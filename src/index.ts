@@ -9,10 +9,21 @@ async function main() {
   console.log('===========================================\n');
 
   try {
-    // Validate configuration
-    if (!config.anthropicApiKey) {
-      console.warn('WARNING: ANTHROPIC_API_KEY not set. AI analysis will not work.');
+    // Display mode
+    console.log('Configuration:');
+    if (config.useAI) {
+      if (config.anthropicApiKey) {
+        console.log('  ✅ AI Mode: ENABLED (using Claude for analysis)');
+      } else {
+        console.warn('  ⚠️  AI Mode: ENABLED but ANTHROPIC_API_KEY not set!');
+        console.warn('      Falling back to local analysis.');
+      }
+    } else {
+      console.log('  ✅ AI Mode: DISABLED (using local rule-based analysis)');
+      console.log('      100% local, no external APIs, completely FREE!');
     }
+    console.log(`  ℹ️  Embedding Provider: ${config.embeddingProvider}`);
+    console.log('');
 
     // Initialize vector store
     console.log('Initializing vector store...');

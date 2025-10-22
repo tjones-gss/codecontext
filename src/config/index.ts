@@ -6,7 +6,8 @@ dotenv.config();
 export type EmbeddingProvider = 'ollama' | 'openai' | 'cohere' | 'none';
 
 export interface Config {
-  // Anthropic
+  // AI Configuration
+  useAI: boolean;  // If false, uses local rule-based analysis instead of Claude
   anthropicApiKey: string;
 
   // Embedding Provider
@@ -54,6 +55,7 @@ export interface Config {
 }
 
 export const config: Config = {
+  useAI: process.env.USE_AI !== 'false',  // Default to true for backward compatibility
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
 
   embeddingProvider: (process.env.EMBEDDING_PROVIDER || 'none') as EmbeddingProvider,

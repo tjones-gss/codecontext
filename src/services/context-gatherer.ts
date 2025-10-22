@@ -7,6 +7,8 @@ import jiraService from './jira-service';
 import mondayService from './monday-service';
 import vectorStore from './vector-store';
 import aiAgent from './ai-agent';
+import localAnalyzer from './local-analyzer';
+import config from '../config';
 
 export class ContextGatherer {
   async gatherContext(filePath: string): Promise<ContextDigest> {
@@ -46,8 +48,15 @@ export class ContextGatherer {
         knownConflicts: [],
       };
 
-      // 8. Use AI to analyze and create digest
-      const digest = await aiAgent.analyzeContext(fileContext, parsedCode, fileContent);
+      // 8. Analyze and create digest (AI or local)
+      let digest: ContextDigest;
+      if (config.useAI && config.anthropicApiKey) {
+        console.log('Using AI-powered analysis (Claude)');
+        digest = await aiAgent.analyzeContext(fileContext, parsedCode, fileContent);
+      } else {
+        console.log('Using local rule-based analysis (no AI)');
+        digest = await localAnalyzer.analyzeContext(fileContext, parsedCode, fileContent);
+      }
 
       // 9. Enhance with Jira issues
       digest.jiraIssues = await this.findJiraIssues(filePath, svnInfo?.recentLogs.map(l => l.message).join(' ') || '');
@@ -64,7 +73,13 @@ export class ContextGatherer {
 
   async generateMarkdownSummary(filePath: string): Promise<string> {
     const digest = await this.gatherContext(filePath);
-    return await aiAgent.generateMarkdownSummary(digest);
+
+    // Use appropriate analyzer for markdown generation
+    if (config.useAI && config.anthropicApiKey) {
+      return await aiAgent.generateMarkdownSummary(digest);
+    } else {
+      return await localAnalyzer.generateMarkdownSummary(digest);
+    }
   }
 
   private async readFile(filePath: string): Promise<string | null> {
