@@ -4,6 +4,8 @@
 
 CodeContext Live is an AI-powered system that surfaces real-time contextual intelligence about any file being edited. It integrates with SVN, Jira, Monday.com, and uses Claude AI to provide developers with comprehensive context about their code.
 
+> **💡 Don't have a powerful machine?** No problem! CodeContext Live works on ANY machine. See [LIGHTWEIGHT_SETUP.md](LIGHTWEIGHT_SETUP.md) for options that don't require Ollama.
+
 ## Features
 
 - **File Monitoring**: Automatically detects when COBOL, VB.NET, or C# files are opened/modified
@@ -47,11 +49,19 @@ CodeContext Live is an AI-powered system that surfaces real-time contextual inte
 
 ### Prerequisites
 
+**Required:**
 - Node.js 18+
 - TypeScript
 - SVN command-line tools
-- [Ollama](https://ollama.ai/) (for local embeddings)
 - Anthropic API key (for Claude)
+
+**Optional (for embeddings):**
+- [Ollama](https://ollama.ai/) (local, requires powerful machine) **OR**
+- OpenAI API key (cloud, works on any machine) **OR**
+- Cohere API key (cloud, works on any machine) **OR**
+- None (keyword search, works on any machine, FREE)
+
+> **See [LIGHTWEIGHT_SETUP.md](LIGHTWEIGHT_SETUP.md) for detailed options if you don't have a powerful machine.**
 
 ### Installation
 
@@ -77,11 +87,16 @@ cp .env.example .env
 npm run build
 ```
 
-5. Start Ollama (in a separate terminal):
-```bash
-ollama serve
-ollama pull llama2
-```
+5. **Choose your embedding provider** (see [LIGHTWEIGHT_SETUP.md](LIGHTWEIGHT_SETUP.md)):
+   - **No embeddings (FREE, any machine)**: Set `EMBEDDING_PROVIDER=none` in `.env`
+   - **OpenAI (cloud, $0.02 per 1K files)**: Set `EMBEDDING_PROVIDER=openai` + API key
+   - **Cohere (cloud, FREE tier)**: Set `EMBEDDING_PROVIDER=cohere` + API key
+   - **Ollama (local, powerful machine)**: Start Ollama first:
+     ```bash
+     ollama serve
+     ollama pull llama2
+     ```
+     Then set `EMBEDDING_PROVIDER=ollama`
 
 6. Start CodeContext Live:
 ```bash
@@ -97,7 +112,21 @@ Edit `.env` file with your settings:
 ```env
 # Required
 ANTHROPIC_API_KEY=your_api_key_here
+
+# Embedding Provider (choose based on your machine)
+EMBEDDING_PROVIDER=none  # Options: none, openai, cohere, ollama
+
+# If using OpenAI (cloud, lightweight)
+OPENAI_API_KEY=sk-...
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+
+# If using Cohere (cloud, lightweight, FREE tier)
+COHERE_API_KEY=...
+COHERE_EMBEDDING_MODEL=embed-english-light-v3.0
+
+# If using Ollama (local, requires powerful machine)
 OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama2
 
 # SVN Configuration
 SVN_REPO_PATH=\\\\LocalCobolSearch\\trunk\\cobol\\fujsource

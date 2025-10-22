@@ -15,19 +15,34 @@ export class VectorStore {
   private ollamaClient = axios.create({
     baseURL: config.ollamaBaseUrl,
   });
+  private embeddingEnabled: boolean;
+
+  constructor() {
+    this.embeddingEnabled = config.embeddingProvider !== 'none';
+
+    if (this.embeddingEnabled) {
+      console.log(`Using embedding provider: ${config.embeddingProvider}`);
+    } else {
+      console.log('Embeddings disabled - using keyword-based search fallback');
+    }
+  }
 
   async initialize() {
     await this.loadIndex();
   }
 
   async addDocument(id: string, content: string, metadata: Record<string, any>) {
-    const embedding = await this.generateEmbedding(content);
+    let embedding: number[] | null = null;
+
+    if (this.embeddingEnabled) {
+      embedding = await this.generateEmbedding(content);
+    }
 
     const doc: Document = {
       id,
       content,
       metadata,
-      embedding,
+      embedding: embedding || undefined,
     };
 
     this.documents.set(id, doc);
@@ -35,10 +50,15 @@ export class VectorStore {
   }
 
   async search(query: string, topK: number = 5): Promise<Document[]> {
+    if (!this.embeddingEnabled || this.documents.size === 0) {
+      // Fallback to keyword search
+      return this.keywordSearch(query, topK);
+    }
+
     const queryEmbedding = await this.generateEmbedding(query);
 
     if (!queryEmbedding) {
-      return [];
+      return this.keywordSearch(query, topK);
     }
 
     const results: Array<{ doc: Document; score: number }> = [];
@@ -58,8 +78,13 @@ export class VectorStore {
   async findRelatedFiles(filePath: string, topK: number = 10): Promise<Array<{ path: string; score: number }>> {
     const doc = this.documents.get(filePath);
 
-    if (!doc || !doc.embedding) {
+    if (!doc) {
       return [];
+    }
+
+    if (!this.embeddingEnabled || !doc.embedding) {
+      // Fallback to keyword-based similarity
+      return this.keywordBasedRelatedFiles(filePath, topK);
     }
 
     const results: Array<{ path: string; score: number }> = [];
@@ -78,6 +103,25 @@ export class VectorStore {
 
   private async generateEmbedding(text: string): Promise<number[] | null> {
     try {
+      switch (config.embeddingProvider) {
+        case 'ollama':
+          return await this.generateOllamaEmbedding(text);
+        case 'openai':
+          return await this.generateOpenAIEmbedding(text);
+        case 'cohere':
+          return await this.generateCohereEmbedding(text);
+        case 'none':
+        default:
+          return null;
+      }
+    } catch (error) {
+      console.error(`Error generating embedding with ${config.embeddingProvider}:`, error);
+      return null;
+    }
+  }
+
+  private async generateOllamaEmbedding(text: string): Promise<number[] | null> {
+    try {
       const response = await this.ollamaClient.post('/api/embeddings', {
         model: config.ollamaModel,
         prompt: text,
@@ -85,9 +129,124 @@ export class VectorStore {
 
       return response.data.embedding;
     } catch (error) {
-      console.error('Error generating embedding:', error);
-      return null;
+      console.error('Ollama embedding error:', error);
+      throw error;
     }
+  }
+
+  private async generateOpenAIEmbedding(text: string): Promise<number[] | null> {
+    if (!config.openaiApiKey) {
+      throw new Error('OpenAI API key not configured');
+    }
+
+    try {
+      const response = await axios.post(
+        'https://api.openai.com/v1/embeddings',
+        {
+          model: config.openaiEmbeddingModel,
+          input: text.substring(0, 8000), // OpenAI has token limits
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${config.openaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data.data[0].embedding;
+    } catch (error) {
+      console.error('OpenAI embedding error:', error);
+      throw error;
+    }
+  }
+
+  private async generateCohereEmbedding(text: string): Promise<number[] | null> {
+    if (!config.cohereApiKey) {
+      throw new Error('Cohere API key not configured');
+    }
+
+    try {
+      const response = await axios.post(
+        'https://api.cohere.ai/v1/embed',
+        {
+          model: config.cohereEmbeddingModel,
+          texts: [text.substring(0, 8000)], // Cohere has limits too
+          truncate: 'END',
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${config.cohereApiKey}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      return response.data.embeddings[0];
+    } catch (error) {
+      console.error('Cohere embedding error:', error);
+      throw error;
+    }
+  }
+
+  private keywordSearch(query: string, topK: number): Document[] {
+    const queryTokens = this.tokenize(query.toLowerCase());
+    const results: Array<{ doc: Document; score: number }> = [];
+
+    for (const doc of this.documents.values()) {
+      const contentTokens = this.tokenize(doc.content.toLowerCase());
+      const score = this.calculateKeywordScore(queryTokens, contentTokens);
+
+      if (score > 0) {
+        results.push({ doc, score });
+      }
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, topK).map(r => r.doc);
+  }
+
+  private keywordBasedRelatedFiles(filePath: string, topK: number): Array<{ path: string; score: number }> {
+    const doc = this.documents.get(filePath);
+    if (!doc) return [];
+
+    const sourceTokens = this.tokenize(doc.content.toLowerCase());
+    const results: Array<{ path: string; score: number }> = [];
+
+    for (const [path, otherDoc] of this.documents.entries()) {
+      if (path === filePath) continue;
+
+      const targetTokens = this.tokenize(otherDoc.content.toLowerCase());
+      const score = this.calculateKeywordScore(sourceTokens, targetTokens);
+
+      if (score > 0) {
+        results.push({ path, score });
+      }
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, topK);
+  }
+
+  private tokenize(text: string): Set<string> {
+    // Simple tokenization - split on non-alphanumeric, remove common words
+    const stopWords = new Set(['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by']);
+
+    const tokens = text
+      .split(/[^a-z0-9]+/)
+      .filter(token => token.length > 2 && !stopWords.has(token));
+
+    return new Set(tokens);
+  }
+
+  private calculateKeywordScore(tokensA: Set<string>, tokensB: Set<string>): number {
+    if (tokensA.size === 0 || tokensB.size === 0) return 0;
+
+    // Calculate Jaccard similarity
+    const intersection = new Set([...tokensA].filter(x => tokensB.has(x)));
+    const union = new Set([...tokensA, ...tokensB]);
+
+    return intersection.size / union.size;
   }
 
   private cosineSimilarity(a: number[], b: number[]): number {
@@ -179,6 +338,14 @@ export class VectorStore {
     } catch (error) {
       console.error(`Error indexing file ${filePath}:`, error);
     }
+  }
+
+  isEmbeddingEnabled(): boolean {
+    return this.embeddingEnabled;
+  }
+
+  getProvider(): string {
+    return config.embeddingProvider;
   }
 }
 

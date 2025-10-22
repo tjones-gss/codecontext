@@ -3,13 +3,26 @@ import path from 'path';
 
 dotenv.config();
 
+export type EmbeddingProvider = 'ollama' | 'openai' | 'cohere' | 'none';
+
 export interface Config {
   // Anthropic
   anthropicApiKey: string;
 
-  // Ollama
+  // Embedding Provider
+  embeddingProvider: EmbeddingProvider;
+
+  // Ollama (local - requires powerful machine)
   ollamaBaseUrl: string;
   ollamaModel: string;
+
+  // OpenAI (cloud - lightweight alternative)
+  openaiApiKey?: string;
+  openaiEmbeddingModel: string;
+
+  // Cohere (cloud - lightweight alternative)
+  cohereApiKey?: string;
+  cohereEmbeddingModel: string;
 
   // SVN
   svnRepoPath: string;
@@ -35,7 +48,6 @@ export interface Config {
 
   // Vector Store
   vectorStorePath: string;
-  embeddingModel: string;
 
   // File Watching
   watchExtensions: string[];
@@ -44,8 +56,16 @@ export interface Config {
 export const config: Config = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY || '',
 
+  embeddingProvider: (process.env.EMBEDDING_PROVIDER || 'none') as EmbeddingProvider,
+
   ollamaBaseUrl: process.env.OLLAMA_BASE_URL || 'http://localhost:11434',
   ollamaModel: process.env.OLLAMA_MODEL || 'llama2',
+
+  openaiApiKey: process.env.OPENAI_API_KEY,
+  openaiEmbeddingModel: process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small',
+
+  cohereApiKey: process.env.COHERE_API_KEY,
+  cohereEmbeddingModel: process.env.COHERE_EMBEDDING_MODEL || 'embed-english-light-v3.0',
 
   svnRepoPath: process.env.SVN_REPO_PATH || '',
   svnUsername: process.env.SVN_USERNAME,
@@ -65,7 +85,6 @@ export const config: Config = {
   host: process.env.HOST || 'localhost',
 
   vectorStorePath: process.env.VECTOR_STORE_PATH || './data/vector_store',
-  embeddingModel: process.env.EMBEDDING_MODEL || 'all-MiniLM-L6-v2',
 
   watchExtensions: process.env.WATCH_EXTENSIONS?.split(',') || ['.cbl', '.vb', '.cs'],
 };
